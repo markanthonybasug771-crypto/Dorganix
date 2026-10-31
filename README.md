@@ -33,6 +33,7 @@ The single configured admin is the Firebase Authentication account with email `D
 - Student profiles for Grades 7–12; students see their own marks.
 - Teacher registration requires admin approval. Approved teachers can view student rosters and subjects in their grade level.
 - Admin-only subject management and grade entry.
+- Admins can delete students and their Firestore profile, private profile, and grade records; the Firebase Authentication account must be deleted separately in Firebase Console.
 - Firestore Security Rules restrict records by role and grade. The configured admin is verified from the signed-in Firebase Auth email; other profile role fields cannot grant admin access.
 - Firebase Hosting configuration and deployment scripts.
 - Installable PWA; the login screen hides its install button after installation.
