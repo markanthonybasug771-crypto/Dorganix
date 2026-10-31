@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isConfiguredAdmin() {
+      return signedIn() && request.auth.token.email in ['Dorganda@high.com', 'dorganda@high.com'];
+    }
+    function isAdmin() { return signedIn() && (request.auth.token.admin == true || isConfiguredAdmin()); }
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isApprovedTeacher() {
+      return signedIn() && profile().role == 'teacher' && profile().approved == true;
+    }
+    function canReadGrade(level) {
+      return isAdmin()
+        || (signedIn() && profile().role == 'student' && profile().gradeLevel == level)
+        || (isApprovedTeacher() && profile().gradeLevel == level);
+    }
+    function validGrade(level) {
+      return level in ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+    }
+
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'firstName', 'middleName', 'lastName', 'email', 'role', 'gradeLevel', 'studentId', 'approved', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.firstName is string
+        && request.resource.data.middleName is string
+        && request.resource.data.lastName is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.studentId is string
+        && (
+          (request.resource.data.role in ['student', 'teacher']
+            && validGrade(request.resource.data.gradeLevel)
+            && request.resource.data.approved == (request.resource.data.role == 'student'))
+          || (isConfiguredAdmin()
+            && request.resource.data.role == 'admin'
+            && request.resource.data.gradeLevel == null
+            && request.resource.data.approved == true)
+        );
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid)
+        || (isApprovedTeacher() && resource.data.role == 'student' && resource.data.gradeLevel == profile().gradeLevel);
+      allow update: if (isAdmin() && resource.data.role == 'teacher'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved'])
+        ) || (isAdmin() && resource.data.role == 'student'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gradeLevel', 'previousGradeLevel', 'promotedAfterSchoolYear', 'promotedAt', 'graduated', 'graduatedAfterSchoolYear', 'graduatedAt']))
+        || (isConfiguredAdmin() && request.auth.uid == uid
+          && request.resource.data.role == 'admin'
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.gradeLevel == null
+          && request.resource.data.approved == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'email', 'role', 'gradeLevel', 'approved']));
+      allow delete: if isAdmin() && resource.data.role != 'admin';
+    }
+
+    match /privateProfiles/{uid} {
+      allow get: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow list: if false;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['birthday', 'age', 'gender', 'address', 'cpNumber', 'updatedAt'])
+        && request.resource.data.birthday is string
+        && request.resource.data.age is int
+        && request.resource.data.age >= 1 && request.resource.data.age <= 120
+        && request.resource.data.gender in ['Female', 'Male', 'Prefer not to say']
+        && request.resource.data.address is string
+        && request.resource.data.cpNumber is string;
+      allow delete: if isAdmin();
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if canReadGrade(resource.data.gradeLevel);
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['name', 'gradeLevel', 'term', 'teacherUid', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.term in ['Term 1', 'Term 2', 'Term 3']
+        && validGrade(request.resource.data.gradeLevel);
+      allow update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['name', 'gradeLevel', 'term', 'teacherUid', 'createdAt'])
+        && request.resource.data.term in ['Term 1', 'Term 2', 'Term 3']
+        && validGrade(request.resource.data.gradeLevel);
+      allow delete: if isAdmin();
+    }
+
+    match /grades/{gradeId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.studentUid == request.auth.uid)
+        || (isApprovedTeacher() && resource.data.gradeLevel == profile().gradeLevel);
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['studentUid', 'subjectId', 'subjectName', 'gradeLevel', 'schoolYear', 'score', 'period', 'createdAt', 'enteredBy'])
+        && request.resource.data.subjectName is string
+        && request.resource.data.schoolYear is string
+        && request.resource.data.schoolYear.matches('^[0-9]{4}-[0-9]{4}$')
+        && request.resource.data.period in ['Term 1', 'Term 2', 'Term 3']
+        && validGrade(request.resource.data.gradeLevel)
+        && request.resource.data.score is number
+        && request.resource.data.score >= 0 && request.resource.data.score <= 100
+        && request.resource.data.enteredBy == request.auth.uid
+        && get(/databases/$(database)/documents/users/$(request.resource.data.studentUid)).data.gradeLevel == request.resource.data.gradeLevel
+        && get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.gradeLevel == request.resource.data.gradeLevel
+        && (get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.get('term', '') == ''
+          || get(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId)).data.get('term', '') == request.resource.data.period);
+      allow update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && settingId == 'academic'
+        && request.resource.data.schoolYear is string
+        && request.resource.data.schoolYear.matches('^[0-9]{4}-[0-9]{4}$');
+      allow delete: if isAdmin();
+    }
+  }
+}

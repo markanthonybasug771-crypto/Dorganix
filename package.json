@@ -1,0 +1,18 @@
+{
+  "name": "dorganix",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dorganix student portal on Firebase",
+  "scripts": {
+    "deploy": "firebase deploy --project dorganix-d4a15 --only hosting,firestore:rules",
+    "deploy:hosting": "firebase deploy --project dorganix-d4a15 --only hosting",
+    "deploy:rules": "firebase deploy --project dorganix-d4a15 --only firestore:rules",
+    "bootstrap:admin": "node scripts/bootstrap-admin.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.34.1"
+  }
+}

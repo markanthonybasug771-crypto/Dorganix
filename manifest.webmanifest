@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "Dorganix Student Portal",
+  "short_name": "Dorganix",
+  "description": "Dorganda High School student, teacher, and administrator portal.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f8fc",
+  "theme_color": "#f4f8fc",
+  "icons": [
+    {
+      "src": "/assets/dorganix-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/dorganix-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
